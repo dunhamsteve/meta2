@@ -1,4 +1,5 @@
 const fs = require('fs')
+const DEBUG = false
 function run(prog, text) {
     const ll = prog.split("\n").map(l => {
       m = l.match(/(.*?)($|\t(\w+)(\s(.*))?)/)
@@ -28,22 +29,23 @@ function run(prog, text) {
       if (first(text[pos])) { pos++; while (rest(text[pos])) pos++}
       flag = pos != s
       if (flag) tok = text.slice(s,pos)
-      console.log('tok',s,pos,flag,tok)
+      DEBUG && console.log('tok',s,pos,flag,tok)
     }
     const ops = {
       SET() { flag = true },
-      B(arg) { jump(arg) },
+      B(arg) { jump(arg) }, // UNUSED
       BT(arg) { flag && jump(arg) },
       BF(arg) { flag || jump(arg) },
       BE() { if (!flag) throw "Error"},
       ID() { token(isAlpha,isIdent) },
+      NUM() { token(isDigit, isDigit) }, // UNUSED
       CL(arg) { out += arg.slice(1,-1) },
       CI() { out += tok },
       OUT() { rval += out + "\n"; out = "\t" },
       CLL(arg) { stack.push([l1,l2,pc]); l1 = l2 = ''; jump(arg)},
       LB() { out = '' },
       GN1() { if (!l1) l1 = 'L'+ix++; out += l1; },
-      GN2() { if (!l2) l2 = 'L'+ix++; out += l2; },
+      GN2() { if (!l2) l2 = 'L'+ix++; out += l2; }, // UNUSED
       TST(arg) { 
         skipws(); 
         flag = text.slice(pos).startsWith(arg.slice(1,-1)) 
@@ -59,9 +61,9 @@ function run(prog, text) {
           tok = text.slice(s,pos)
         }
         flag = pos != s
-        console.log('$',flag,tok)
+        DEBUG && console.log('$',{flag,tok})
       },
-      R() { 
+      R() {
         if (stack.length) { 
           [l1,l2,pc] = stack.pop();
         } else {
@@ -73,7 +75,7 @@ function run(prog, text) {
     for (; ; pc++) {
         const [lab, op, arg] = ll[pc];
         if (op === 'END') return rval
-        console.log(pc, '@', pos, ll[pc].join('\t'))
+        DEBUG &&  console.log(pc, '@', pos, ll[pc].join('\t'))
         if (lab) continue
         (ops[op]||fail(op))(arg)
         if (step++ > 10000) throw "infinite loop/"
@@ -87,3 +89,7 @@ fs.writeFileSync('meta2.s',rval)
 if (rval !== prog) throw "mismatch"
 let rval2 = run(rval,meta)
 if (rval !== rval2) throw "mismatch2"
+const jmeta = fs.readFileSync('js.meta','utf8')
+const jprog = run(prog,jmeta)
+const rval3 = run(jprog,jmeta)
+fs.writeFileSync('meta3.js',rval3)

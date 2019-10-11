@@ -1,0 +1,86 @@
+.SYNTAX PROGRAM
+
+OUT1 = '*'  .OUT('out += tok')  / 
+       .STRING .OUT('out += quote('*')')
+.,
+
+OUTPUT = ('.OUT' '(' $OUT1 ')' / '.LABEL' .OUT('LB') OUT1) 
+         .OUT('rval += out + "\n"; out = "\t"') 
+.,
+
+EX3 = .ID .OUT(*'()') /
+      .STRING   .OUT('match('*')')  /
+      '.ID'     .OUT('ident()')     /
+      '.NUMBER' .OUT('number()')    /
+      '.STRING' .OUT('string()')    /
+      '(' EX1 ')'                   /
+      '.EMPTY'  .OUT('flag = true') /
+      '$'       .OUT('while (flag) {')
+      EX3       .OUT('}')
+                .OUT('flag = true')
+.,
+
+EX2 = (EX3 / OUTPUT)
+      .OUT('if (flag) {') 
+      $(EX3 .OUT('if (!flag) throw "error"') / OUTPUT)
+      .OUT('}')
+.,
+
+EX1 = .OUT('while(true) {')
+      EX2 $('/' .OUT('if (flag) break') EX2 )
+      .OUT('break')
+      .OUT('}')
+.,
+
+ST = .ID .OUT('function ' * '() {' )
+     '='  EX1
+     '.,' .OUT('}')
+.,
+
+PROGRAM = '.SYNTAX' .ID 
+    .OUT('// ' *)
+    .OUT('function compile(text) {')
+    .OUT('let flag = true')
+    .OUT('let pos = 0')
+    .OUT('let tok = ""')
+    .OUT('let rval = "";')
+    .OUT('let out = "\t";')
+    .OUT('const skipws = () => { while (" \t\n".indexOf(text[pos])>=0) pos++ }')
+    .OUT('const isAlpha = c => c >= "a" && c <= "z" || c >= "A" && c <= "Z"')
+    .OUT('const isDigit = c => c >= "0" && c <= "9"')
+    .OUT('const isIdent = c => isAlpha(c) || isDigit(c)')
+    .OUT('const quote = s => s.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/\t/g,"\\t")')
+    .OUT('function match(s) {')
+    .OUT('    skipws()')
+    .OUT('    flag = text.slice(pos).startsWith(s)')
+    .OUT('    if (flag) { pos += s.length; tok = s; }')
+    .OUT('}')
+    .OUT('function token(first,rest) {')
+    .OUT('    skipws()')
+    .OUT('    const s = pos')
+    .OUT('    if (first(text[pos])) { pos++; while (rest(text[pos])) pos++}')
+    .OUT('    flag = pos != s')
+    .OUT('    if (flag) tok = text.slice(s,pos)')
+    .OUT('}')
+    .OUT('function string() {')
+    .OUT('    skipws()')
+    .OUT('    const s = pos')
+    .OUT('    if (text.charCodeAt(pos) === 39) {')
+    .OUT('        pos++')
+    .OUT('        while (text.charCodeAt(pos) !== 39) pos++')
+    .OUT('        pos++')
+    .OUT('        tok = text.slice(s,pos)')
+    .OUT('      }')
+    .OUT('      flag = pos != s')
+    .OUT('}')
+    .OUT('function ident() { token(isAlpha,isIdent) }')
+    .OUT('function num() { token(isDigit, isDigit) }')
+
+    .OUT(* '();')
+$ ST '.END'
+    .OUT('return rval')
+    .OUT('}')
+    .OUT('exports.compile = compile')
+.,
+
+.END
